@@ -206,8 +206,8 @@ REST_FRAMEWORK = {
 
 # swagger
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'DRF Custom Auth API',
-    'DESCRIPTION': 'Auto-generated API schema',
+    'TITLE': 'Ecommerce & POS',
+    'DESCRIPTION': 'Ecommerce Web with POS and Inventory Management',
     'VERSION': '1.0.0',
 
     'SERVE_INCLUDE_SCHEMA': False,
