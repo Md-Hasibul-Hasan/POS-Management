@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from .models import LoginHistory, TwoFALog, User, UserSession
+from .models import LoginHistory, TwoFALog, User, UserSession, EmployeeInvitation
 from .utils import logout_all_user_sessions
 
 
@@ -15,6 +15,7 @@ class UserModelAdmin(BaseUserAdmin):
         'id',
         'email',
         'name',
+        'role',
         'image_preview',
         'is_active',
         'is_staff',
@@ -26,6 +27,7 @@ class UserModelAdmin(BaseUserAdmin):
     )
     list_display_links = ('id', 'email', 'name')
     list_filter = (
+        'role',
         'is_active',
         'is_staff',
         'is_superuser',
@@ -34,7 +36,7 @@ class UserModelAdmin(BaseUserAdmin):
         'created_at',
         'updated_at',
     )
-    search_fields = ('email', 'name', 'last_login_ip')
+    search_fields = ('email', 'name', 'last_login_ip', 'role')
     ordering = ('email', 'id')
     filter_horizontal = ('groups', 'user_permissions')
     readonly_fields = (
@@ -85,7 +87,7 @@ class UserModelAdmin(BaseUserAdmin):
             'fields': ('email', 'password'),
         }),
         (_('Personal Details'), {
-            'fields': ('name', 'image', 'image_preview'),
+            'fields': ('name', 'role', 'image', 'image_preview'),
         }),
         (_('Permissions'), {
             'classes': ('collapse',),
@@ -267,6 +269,39 @@ class UserModelAdmin(BaseUserAdmin):
             two_fa_locked_until=None,
         )
         self.message_user(request, f'Security codes cleared for {updated} user(s).', messages.SUCCESS)
+
+
+@admin.register(EmployeeInvitation)
+class EmployeeInvitationAdmin(admin.ModelAdmin):
+    model = EmployeeInvitation
+
+    list_display = (
+        'id',
+        'email',
+        'role',
+        'invited_by',
+        'created_at',
+        'expires_at',
+        'is_used',
+        'is_expired_status',
+    )
+    list_filter = ('role', 'is_used', 'created_at')
+    search_fields = ('email', 'invited_by__email')
+    ordering = ('-created_at',)
+    readonly_fields = ('token', 'created_at')
+
+    def is_expired_status(self, obj):
+        if obj.is_expired():
+            return format_html(
+                '<span style="color:#b91c1c;font-weight:600;">{}</span>',
+                'Expired'
+            )
+        return format_html(
+            '<span style="color:#15803d;font-weight:600;">{}</span>',
+            'Active'
+        )
+
+    is_expired_status.short_description = 'Status'
 
 
 @admin.register(LoginHistory)

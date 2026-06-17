@@ -40,10 +40,15 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
+        # Remove password2 if present (it's a write_only field for validation only)
+        validated_data.pop('password2', None)
+        user = User.objects.create_user(**validated_data)
+        # Auto-assign customer role
+        user.role = 'customer'
+        user.save()
+        return user
     
-
-
+    
 
 
 
@@ -122,7 +127,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'email',
             'name',
             'image',
-            'is_active'
+            'is_active',
+            'role',
         ]
 
 
@@ -457,6 +463,102 @@ class UserSessionSerializer(serializers.ModelSerializer):
 
 
 
+
+
+# ======================================================
+#   Employee Invitation Serializers
+# ======================================================
+
+class EmployeeInviteSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=255)
+    role = serializers.ChoiceField(choices=['owner', 'manager', 'salesman'])
+
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email=value).exists():
+            user = User.objects.get(email=value)
+            # Allow inviting existing customers (role upgrade)
+            if user.role != 'customer':
+                raise serializers.ValidationError('This user is already an employee')
+        if EmployeeInvitation.objects.filter(email=value, is_used=False).exists():
+            existing = EmployeeInvitation.objects.filter(email=value, is_used=False).first()
+            if not existing.is_expired():
+                raise serializers.ValidationError('An active invitation already exists for this email')
+        return value
+
+    def validate_role(self, value):
+        # Invited_by user validation happens in the view
+        return value
+
+
+class EmployeeSetupSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    password = serializers.CharField(
+        max_length=255, style={'input_type': 'password'}, write_only=True
+    )
+    confirm_password = serializers.CharField(
+        max_length=255, style={'input_type': 'password'}, write_only=True
+    )
+
+    def validate_name(self, value):
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError("Name must be at least 2 characters long")
+        return value.strip()
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError('Password must be at least 8 characters long')
+        if not any(c.isdigit() for c in value):
+            raise serializers.ValidationError('Password must contain at least one digit')
+        if not any(c.isupper() for c in value):
+            raise serializers.ValidationError('Password must contain at least one uppercase letter')
+        return value
+
+    def validate(self, data):
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+        if password != confirm_password:
+            raise serializers.ValidationError('Passwords do not match')
+        return data
+
+
+class EmployeeRoleChangeSerializer(serializers.Serializer):
+    role = serializers.ChoiceField(choices=['owner', 'manager', 'salesman'])
+
+    def validate_role(self, value):
+        request = self.context.get('request')
+        target_user = self.context.get('target_user')
+
+        if not request or not target_user:
+            return value
+
+        current_user = request.user
+
+        # Cannot change role of admin/superuser
+        if target_user.is_superuser or target_user.role == 'admin':
+            raise serializers.ValidationError('Cannot change role of admin user')
+
+        # Cannot change role of customer via this endpoint
+        if target_user.role == 'customer':
+            raise serializers.ValidationError('Use employee invitation to upgrade customer to employee')
+
+        # Permission logic
+        if current_user.is_superuser or current_user.role == 'admin':
+            return value  # admin can do anything
+        elif current_user.role == 'owner':
+            if target_user.role == 'owner' and current_user.id != target_user.id:
+                raise serializers.ValidationError('Only admin can change another owner\'s role')
+            if value == 'owner':
+                raise serializers.ValidationError('Only admin can promote to owner role')
+        elif current_user.role == 'manager':
+            if target_user.role in ('owner', 'manager'):
+                raise serializers.ValidationError('Managers can only change salesman roles')
+            if value == 'owner':
+                raise serializers.ValidationError('Only admin can promote to owner role')
+        else:
+            raise serializers.ValidationError('You do not have permission to change roles')
+
+        return value
 
 
 # ======================================================

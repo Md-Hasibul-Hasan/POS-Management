@@ -52,5 +52,11 @@ urlpatterns = [
     path('token/verify/', views.CustomTokenVerifyView.as_view(), name='token_verify'),
     path('token/refresh/', views.SessionTokenRefreshView.as_view(), name='token_refresh'),
 
+    # Employee Invitation Endpoints
+    path('employees/invite/', views.EmployeeInviteView.as_view(), name='employee-invite'),
+    path('employee/setup/<token>/', views.EmployeeSetupView.as_view(), name='employee-setup'),
+    path('employees/', views.EmployeeListView.as_view(), name='employee-list'),
+    path('employees/<int:user_id>/role/', views.EmployeeRoleChangeView.as_view(), name='employee-role-change'),
+
 
 ]

@@ -41,16 +41,27 @@ class UserManager(BaseUserManager):
         user.is_active = True 
         user.is_staff = True
         user.is_superuser = True
+        user.role = 'admin'
         user.save(using=self._db)
         return user
 
 class User(AbstractBaseUser,PermissionsMixin):
+
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('customer', 'Customer'),
+        ('owner', 'Owner'),
+        ('manager', 'Manager'),
+        ('salesman', 'Salesman'),
+    ]
+
     email = models.EmailField(max_length=255,unique=True)
     name = models.CharField(max_length=255)
     image = models.ImageField(upload_to='profile_images/',null=True,blank=True)
     is_active = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='customer')
     
     # Account security fields
     failed_login_attempts = models.IntegerField(default=0)
@@ -496,4 +507,26 @@ class TwoFALog(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.action} - {self.timestamp}"
+
+
+class EmployeeInvitation(models.Model):
+    """Track employee invitations for role-based onboarding"""
+    email = models.EmailField(max_length=255)
+    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_invitations'
+    )
+    token = models.CharField(max_length=255, unique=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        """Check if the invitation has expired"""
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"Invitation for {self.email} - {self.role}"
 
