@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from ..models import Product, ProductVariant, VariantAttribute, ProductImage, ProductVideo
-from ..services import PricingEngine
+from ..services import ProductService
 from .catalog_serializers import CategoryListSerializer, BrandSerializer
 
 
@@ -21,14 +21,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
     def get_final_price(self, obj):
         """Compute final price including campaign discounts at read time."""
-        campaign, disc_val, disc_type = PricingEngine.find_best_campaign_for_product(obj.product)
-        result = PricingEngine.calculate_variant_price(
-            obj,
-            campaign_discount_value=disc_val,
-            campaign_discount_type=disc_type,
-        )
-        result['campaign_id'] = campaign.id if campaign else None
-        return result
+        return ProductService.get_variant_final_price(obj)
 
 
 class ProductVariantListSerializer(serializers.ModelSerializer):
@@ -42,14 +35,7 @@ class ProductVariantListSerializer(serializers.ModelSerializer):
         ]
 
     def get_final_price(self, obj):
-        campaign, disc_val, disc_type = PricingEngine.find_best_campaign_for_product(obj.product)
-        result = PricingEngine.calculate_variant_price(
-            obj,
-            campaign_discount_value=disc_val,
-            campaign_discount_type=disc_type,
-        )
-        result['campaign_id'] = campaign.id if campaign else None
-        return result
+        return ProductService.get_variant_final_price(obj)
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
@@ -80,21 +66,12 @@ class ProductListSerializer(serializers.ModelSerializer):
         ]
 
     def get_image(self, obj):
-        primary = obj.images.filter(is_primary=True).first()
-        if primary and primary.image:
-            return primary.image.url
-        first_img = obj.images.first()
-        return first_img.image.url if first_img else None
+        return ProductService.get_product_primary_image(obj)
 
     def get_final_price(self, obj):
-        campaign, disc_val, disc_type = PricingEngine.find_best_campaign_for_product(obj)
-        result = PricingEngine.calculate_product_price(
-            obj,
-            campaign_discount_value=disc_val,
-            campaign_discount_type=disc_type,
-        )
-        result['campaign_id'] = campaign.id if campaign else None
-        return result
+        if obj.has_variants:
+            return None
+        return ProductService.get_product_final_price(obj)
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -117,14 +94,7 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_final_price(self, obj):
         if obj.has_variants:
             return None  # Variants have their own final_price
-        campaign, disc_val, disc_type = PricingEngine.find_best_campaign_for_product(obj)
-        result = PricingEngine.calculate_product_price(
-            obj,
-            campaign_discount_value=disc_val,
-            campaign_discount_type=disc_type,
-        )
-        result['campaign_id'] = campaign.id if campaign else None
-        return result
+        return ProductService.get_product_final_price(obj)
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
@@ -135,6 +105,21 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             'total_revenue', 'average_rating', 'total_reviews',
             'created_at', 'updated_at', 'deleted_at'
         ]
+
+    def validate_sku(self, value):
+        """Check SKU uniqueness at serializer level (better error than DB IntegrityError)."""
+        from ..models import Product
+        if Product.all_objects.filter(sku=value).exists():
+            raise serializers.ValidationError(f"Product with SKU '{value}' already exists.")
+        return value
+
+    def validate_barcode(self, value):
+        """Check barcode uniqueness if provided."""
+        if value:
+            from ..models import Product
+            if Product.all_objects.filter(barcode=value).exists():
+                raise serializers.ValidationError(f"Product with barcode '{value}' already exists.")
+        return value
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user

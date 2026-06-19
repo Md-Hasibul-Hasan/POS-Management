@@ -1,0 +1,1 @@
+# POS Test Suite — Workflow integration tests

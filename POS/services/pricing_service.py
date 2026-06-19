@@ -1,4 +1,29 @@
 # =============================================================================
+# PRICING SERVICE
+# =============================================================================
+#
+# Responsibilities:
+# - Calculate product prices
+# - Calculate variant prices
+# - Apply campaign discounts
+# - Apply product discounts
+# - Apply coupon discounts
+# - Determine final selling price
+#
+# Main Methods:
+# - calculate_product_price()
+# - calculate_variant_price()
+# - apply_coupon_discount()
+# - find_best_campaign_for_product()
+# - Determine discount priority
+# - Prevent duplicate discount stacking
+# - Calculate cart totals
+# - Calculate order totals
+# - Calculate tax-inclusive pricing
+# #
+# =============================================================================
+
+# =============================================================================
 #  DISCOUNT PRIORITY ENGINE
 #  =============================================================================
 #  Discount Application Order (highest priority first):
@@ -196,7 +221,7 @@ class PricingEngine:
         now = timezone.now()
 
         if campaigns_queryset is None:
-            from .models.marketing import Campaign
+            from ..models.marketing import Campaign
             campaigns_queryset = Campaign.objects.filter(is_active=True, is_deleted=False)
 
         for campaign in campaigns_queryset:

@@ -153,4 +153,19 @@ urlpatterns = [
     path('ip-blacklist/<int:pk>/', views.IPBlacklistDetailView.as_view(), name='ip-blacklist-detail'),
     path('audit-logs/', views.AuditLogListCreateView.as_view(), name='audit-log-list'),
     path('audit-logs/<int:pk>/', views.AuditLogDetailView.as_view(), name='audit-log-detail'),
+
+    # =========================================================================
+    #  POS OPERATIONS
+    # =========================================================================
+    path('pos/terminals/', views.POSTerminalListCreateView.as_view(), name='pos-terminal-list'),
+    path('pos/terminals/<int:pk>/', views.POSTerminalDetailView.as_view(), name='pos-terminal-detail'),
+    path('pos/shifts/', views.POSShiftListCreateView.as_view(), name='pos-shift-list'),
+    path('pos/shifts/<int:pk>/', views.POSShiftDetailView.as_view(), name='pos-shift-detail'),
+    path('pos/shifts/start/', views.POSShiftStartView.as_view(), name='pos-shift-start'),
+    path('pos/shifts/end/', views.POSShiftEndView.as_view(), name='pos-shift-end'),
+    path('pos/registers/', views.CashRegisterListCreateView.as_view(), name='pos-register-list'),
+    path('pos/registers/<int:pk>/', views.CashRegisterDetailView.as_view(), name='pos-register-detail'),
+    path('pos/registers/reconcile/', views.CashRegisterReconcileView.as_view(), name='pos-register-reconcile'),
+    path('pos/cash-movements/', views.CashMovementListCreateView.as_view(), name='pos-cash-movement-list'),
+    path('pos/cash-movements/<int:pk>/', views.CashMovementDetailView.as_view(), name='pos-cash-movement-detail'),
 ]

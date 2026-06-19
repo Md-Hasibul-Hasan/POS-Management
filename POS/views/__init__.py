@@ -7,3 +7,4 @@ from .marketing_views import *
 from .inventory_views import *
 from .geo_views import *
 from .accounting_views import *
+from .pos_views import *

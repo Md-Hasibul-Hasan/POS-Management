@@ -11,26 +11,39 @@ from ..serializers import (
     CartSerializer, CartItemSerializer,
     ReturnRecordSerializer, ExchangeRequestSerializer, ShipmentSerializer,
 )
+from .mixins import EmployeeFilteredListMixin, EmployeeListMixin
 
 
 @extend_schema(tags=["Orders"])
-class OrderListCreateView(generics.ListCreateAPIView):
+class OrderListCreateView(EmployeeFilteredListMixin, generics.ListCreateAPIView):
     queryset = Order.objects.all()
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployee]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'payment_status', 'fulfillment_status', 'source', 'is_flagged']
     search_fields = ['order_number', 'invoice_number', 'user__email']
     ordering_fields = ['-created_at']
+    select_related_fields = ['user', 'terminal', 'shift', 'cashier']
 
     def get_serializer_class(self):
         if self.request.method == 'GET' and 'pk' not in self.kwargs:
             return OrderListSerializer
         return OrderSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated and (
+            user.role in ('owner', 'manager', 'salesman')
+            or user.is_superuser
+            or user.role == 'admin'
+        ):
+            return qs
+        return qs.filter(user=user)
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(user=self.request.user, created_by=self.request.user)
 
 
 @extend_schema(tags=["Orders"])
@@ -38,30 +51,47 @@ class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployee]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated and (user.role in ('owner', 'manager', 'salesman') or user.is_superuser or user.role == 'admin'):
+            return Order.objects.all()
+        return Order.objects.filter(user=user)
 
 
 @extend_schema(tags=["Orders - Items"])
-class OrderItemListCreateView(generics.ListCreateAPIView):
+class OrderItemListCreateView(EmployeeListMixin, generics.ListCreateAPIView):
     queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployee]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['order']
 
 
 @extend_schema(tags=["Carts"])
-class CartListCreateView(generics.ListCreateAPIView):
+class CartListCreateView(EmployeeFilteredListMixin, generics.ListCreateAPIView):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['user', 'is_active']
+    select_related_fields = ['user']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated and (user.role in ('owner', 'manager', 'salesman') or user.is_superuser or user.role == 'admin'):
+            return qs
+        return qs.filter(user=user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 @extend_schema(tags=["Carts"])
@@ -69,16 +99,22 @@ class CartDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated and (user.role in ('owner', 'manager', 'salesman') or user.is_superuser or user.role == 'admin'):
+            return Cart.objects.all()
+        return Cart.objects.filter(user=user)
 
 
 @extend_schema(tags=["Carts - Items"])
-class CartItemListCreateView(generics.ListCreateAPIView):
+class CartItemListCreateView(EmployeeListMixin, generics.ListCreateAPIView):
     queryset = CartItem.objects.all()
     serializer_class = CartItemSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['cart', 'product']
@@ -89,12 +125,12 @@ class CartItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CartItem.objects.all()
     serializer_class = CartItemSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [UserRenderer]
 
 
 @extend_schema(tags=["Returns"])
-class ReturnRecordListCreateView(generics.ListCreateAPIView):
+class ReturnRecordListCreateView(EmployeeListMixin, generics.ListCreateAPIView):
     queryset = ReturnRecord.objects.all()
     serializer_class = ReturnRecordSerializer
     authentication_classes = [SessionJWTAuthentication]
@@ -115,7 +151,7 @@ class ReturnRecordDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 @extend_schema(tags=["Exchanges"])
-class ExchangeRequestListCreateView(generics.ListCreateAPIView):
+class ExchangeRequestListCreateView(EmployeeListMixin, generics.ListCreateAPIView):
     queryset = ExchangeRequest.objects.all()
     serializer_class = ExchangeRequestSerializer
     authentication_classes = [SessionJWTAuthentication]
@@ -135,7 +171,7 @@ class ExchangeRequestDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 @extend_schema(tags=["Shipments"])
-class ShipmentListCreateView(generics.ListCreateAPIView):
+class ShipmentListCreateView(EmployeeListMixin, generics.ListCreateAPIView):
     queryset = Shipment.objects.all()
     serializer_class = ShipmentSerializer
     authentication_classes = [SessionJWTAuthentication]

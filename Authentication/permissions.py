@@ -47,10 +47,23 @@ class IsEmployeeOrReadOnly(BasePermission):
     operations only for employees (owner, manager, salesman) or admin.
     """
     def has_permission(self, request, view):
-        # Allow read methods for any authenticated user
         if request.method in SAFE_METHODS:
             return request.user and request.user.is_authenticated
-        # Write methods require employee role
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (_is_employee(request.user) or _is_admin(request.user))
+        )
+
+
+class IsPublicReadEmployeeWrite(BasePermission):
+    """
+    Allow read access to ANY user (even unauthenticated/public),
+    but write/create/delete operations only for employees or admin.
+    """
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True  # Anyone can read
         return (
             request.user
             and request.user.is_authenticated
@@ -66,6 +79,21 @@ class IsOwnerOrManagerOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return request.user and request.user.is_authenticated
+        return (
+            request.user
+            and request.user.is_authenticated
+            and (request.user.role in ('owner', 'manager') or _is_admin(request.user))
+        )
+
+
+class IsPublicReadOwnerManagerWrite(BasePermission):
+    """
+    Allow read access to ANY user (even unauthenticated/public),
+    but write/create/delete only for owners, managers, or admin.
+    """
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True  # Anyone can read
         return (
             request.user
             and request.user.is_authenticated

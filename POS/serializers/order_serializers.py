@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from ..models import Order, OrderItem, OrderStatusLog, OrderCoupon, Cart, CartItem
 from ..models import ReturnRecord, ReturnItem, ReturnInspection, ExchangeRequest, Shipment
-from ..services import PricingEngine
+from ..services import OrderService
 
 
 class OrderStatusLogSerializer(serializers.ModelSerializer):
@@ -61,81 +61,40 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
 
     def validate_coupons(self, value):
-        """Validate and compute coupon discount at the order level."""
+        """Validate and compute coupon discount at the order level.
+        Delegates to OrderService to keep business logic in services.
+        """
         request = self.context.get('request')
         if request and request.method in ('POST', 'PUT', 'PATCH'):
-            subtotal = self.initial_data.get('subtotal', 0)
-            total_discount = 0
-            for coupon in value:
-                result = PricingEngine.apply_coupon_discount(
-                    price_before_coupon=subtotal,
-                    coupon=coupon,
-                )
-                total_discount += result['coupon_discount']
-            # Cap discount at subtotal
-            if total_discount > subtotal:
-                raise serializers.ValidationError('Total coupon discount cannot exceed the subtotal.')
+            subtotal = request.data.get('subtotal', 0)
+            from decimal import Decimal
+            subtotal = Decimal(str(subtotal))
+            try:
+                OrderService.validate_coupons_for_order(subtotal, value)
+            except ValueError as e:
+                raise serializers.ValidationError(str(e))
         return value
 
 
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
-    unit_price = serializers.SerializerMethodField()
-    total_price = serializers.SerializerMethodField()
+    unit_price = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_price = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = CartItem
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
 
-    def get_unit_price(self, obj):
-        """Get the final price per unit (campaign → variant → product discount)."""
-        if obj.variant:
-            campaign, disc_val, disc_type = PricingEngine.find_best_campaign_for_product(obj.product)
-            result = PricingEngine.calculate_variant_price(
-                obj.variant,
-                campaign_discount_value=disc_val,
-                campaign_discount_type=disc_type,
-            )
-            return result['selling_price']
-        # Non-variant product
-        campaign, disc_val, disc_type = PricingEngine.find_best_campaign_for_product(obj.product)
-        result = PricingEngine.calculate_product_price(
-            obj.product,
-            campaign_discount_value=disc_val,
-            campaign_discount_type=disc_type,
-        )
-        return result['selling_price']
-
-    def get_total_price(self, obj):
-        unit = self.get_unit_price(obj)
-        return unit * obj.quantity
-
     def create(self, validated_data):
         cart_item = super().create(validated_data)
-        # Recalculate cart totals
-        self._recalc_cart_totals(cart_item.cart)
+        OrderService.recalculate_cart_totals(cart_item.cart)
         return cart_item
 
     def update(self, instance, validated_data):
         instance = super().update(instance, validated_data)
-        self._recalc_cart_totals(instance.cart)
+        OrderService.recalculate_cart_totals(instance.cart)
         return instance
-
-    def _recalc_cart_totals(self, cart):
-        """Recalculate cart totals after any item mutation."""
-        subtotal = 0
-        discount_amount = 0
-        for item in cart.items.all():
-            unit = self.get_unit_price(item)
-            subtotal += unit * item.quantity
-            # Track product-level discount
-            if item.product.discount_value > 0:
-                discount_amount += item.product.discount_value * item.quantity
-        cart.subtotal = subtotal
-        cart.discount_amount = discount_amount
-        cart.total_amount = max(subtotal - discount_amount, 0)
-        cart.save(update_fields=['subtotal', 'discount_amount', 'total_amount'])
 
 
 class CartSerializer(serializers.ModelSerializer):

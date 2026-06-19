@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.utils.text import slugify
+from hashlib import md5
 
 from .common import BaseModel
 
@@ -281,6 +282,13 @@ class ProductVariant(BaseModel):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
+        
+
+        if not self.attribute_signature:
+            self.attribute_signature = md5(
+                f"{self.product_id}-{self.sku}".encode()
+            ).hexdigest()
+
         self._update_selling_price()
         super().save(*args, **kwargs)
 
@@ -297,3 +305,5 @@ class ProductVariant(BaseModel):
             self.selling_price = max(self.base_price - self.discount_value, 0)
         else:
             self.selling_price = self.base_price
+
+

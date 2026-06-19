@@ -12,6 +12,10 @@ from .common import BaseModel
 
 User = get_user_model()
 
+# Forward references for POS integration (avoid circular imports)
+# POSTerminal, POSShift — imported in clean() / methods where needed
+# CashRegister — imported in services/payment_service.py or pos_service.py
+
 
 # =============================================================================
 #  ORDER
@@ -66,6 +70,20 @@ class Order(BaseModel):
     is_flagged = models.BooleanField(default=False)
     return_requested = models.BooleanField(default=False)
     exchange_requested = models.BooleanField(default=False)
+    # ---- POS Integration ----
+    terminal = models.ForeignKey(
+        'POSTerminal', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='orders'
+    )
+    shift = models.ForeignKey(
+        'POSShift', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='orders'
+    )
+    cashier = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='pos_orders'
+    )
+
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_orders')
     confirmed_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
@@ -74,6 +92,9 @@ class Order(BaseModel):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at'], name='idx_order_created_at'),
+        ]
 
     def __str__(self):
         return f"Order {self.order_number} - {self.user.email if self.user else 'Guest'}"

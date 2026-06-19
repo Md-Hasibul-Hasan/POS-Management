@@ -170,6 +170,9 @@ class Payment(BaseModel):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at'], name='idx_payment_created_at'),
+        ]
 
     def __str__(self):
         return f"Payment {self.amount} - {self.status}"

@@ -1,8 +1,8 @@
-from rest_framework import generics, permissions, filters
+from rest_framework import generics, filters
 from drf_spectacular.utils import extend_schema
 from Authentication.authentication import SessionJWTAuthentication
 from Authentication.renderers import UserRenderer
-from Authentication.permissions import IsEmployee, IsOwnerOrManager, IsEmployeeOrReadOnly, IsOwnerOrManagerOrReadOnly
+from Authentication.permissions import IsPublicReadEmployeeWrite
 
 from ..models import Category, Brand, Unit, Tag, Attribute, AttributeValue, ProductFAQ, ProductReview
 from ..serializers import (
@@ -18,7 +18,7 @@ from ..serializers import (
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
     search_fields = ['name', 'slug', 'description']
     ordering_fields = ['name', 'sort_order', 'created_at']
@@ -34,7 +34,7 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -42,7 +42,7 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
 class BrandListCreateView(generics.ListCreateAPIView):
     queryset = Brand.objects.all()
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
     search_fields = ['name', 'slug', 'description']
     ordering_fields = ['name', 'sort_order', 'created_at']
@@ -58,7 +58,7 @@ class BrandDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Brand.objects.all()
     serializer_class = BrandSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -67,7 +67,7 @@ class UnitListCreateView(generics.ListCreateAPIView):
     queryset = Unit.objects.all()
     serializer_class = UnitSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -76,7 +76,7 @@ class UnitDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Unit.objects.all()
     serializer_class = UnitSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -85,7 +85,7 @@ class TagListCreateView(generics.ListCreateAPIView):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -94,7 +94,7 @@ class TagDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -103,7 +103,7 @@ class AttributeListCreateView(generics.ListCreateAPIView):
     queryset = Attribute.objects.all()
     serializer_class = AttributeSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -112,7 +112,7 @@ class AttributeDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Attribute.objects.all()
     serializer_class = AttributeSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -121,7 +121,7 @@ class AttributeValueListCreateView(generics.ListCreateAPIView):
     queryset = AttributeValue.objects.all()
     serializer_class = AttributeValueSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -130,7 +130,7 @@ class AttributeValueDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = AttributeValue.objects.all()
     serializer_class = AttributeValueSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -139,7 +139,7 @@ class ProductFAQListCreateView(generics.ListCreateAPIView):
     queryset = ProductFAQ.objects.all()
     serializer_class = ProductFAQSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -148,7 +148,7 @@ class ProductFAQDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductFAQ.objects.all()
     serializer_class = ProductFAQSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
 
 
@@ -157,7 +157,7 @@ class ProductReviewListCreateView(generics.ListCreateAPIView):
     queryset = ProductReview.objects.all()
     serializer_class = ProductReviewSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]
     search_fields = ['product__name', 'user__email', 'title', 'comment']
     ordering_fields = ['rating', 'created_at']
@@ -168,5 +168,5 @@ class ProductReviewDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = ProductReview.objects.all()
     serializer_class = ProductReviewSerializer
     authentication_classes = [SessionJWTAuthentication]
-    permission_classes = [IsEmployeeOrReadOnly]
+    permission_classes = [IsPublicReadEmployeeWrite]
     renderer_classes = [UserRenderer]

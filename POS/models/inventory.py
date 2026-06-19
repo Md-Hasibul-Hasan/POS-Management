@@ -239,6 +239,9 @@ class InventoryTransaction(BaseModel):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at'], name='idx_invtxn_created_at'),
+        ]
 
     def __str__(self):
         direction = '+' if self.quantity > 0 else ''

@@ -7,3 +7,4 @@ from .marketing_serializers import *
 from .inventory_serializers import *
 from .geo_serializers import *
 from .accounting_serializers import *
+from .pos_serializers import *

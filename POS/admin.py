@@ -31,6 +31,8 @@ from .models import (
     # Accounting
     AccountCategory, AccountTransaction, TaxConfiguration, FraudRule,
     IPBlacklist, AuditLog,
+    # POS Operations
+    POSTerminal, POSShift, CashRegister, CashMovement,
 )
 
 
@@ -901,7 +903,8 @@ class OrderAdmin(admin.ModelAdmin):
     )
     fieldsets = (
         (_('Order Identification'), {
-            'fields': ('order_number', 'invoice_number', 'user', 'source')
+            'fields': ('order_number', 'invoice_number', 'user', 'source',
+                       'terminal', 'shift', 'cashier')
         }),
         (_('Status'), {
             'fields': ('status', 'payment_status', 'fulfillment_status')
@@ -1982,3 +1985,184 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+# =============================================================================
+#  12. POS OPERATIONS ADMIN
+# =============================================================================
+
+@admin.register(POSTerminal)
+class POSTerminalAdmin(admin.ModelAdmin):
+    list_display = ('name', 'terminal_code', 'location', 'is_active', 'shift_count', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name', 'terminal_code', 'location')
+    list_editable = ('is_active',)
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (_('Terminal Info'), {'fields': ('name', 'terminal_code', 'location')}),
+        (_('Status'), {'fields': ('is_active',)}),
+        (_('Ownership'), {'fields': ('created_by',)}),
+        (_('Timestamps'), {'classes': ('collapse',), 'fields': ('created_at', 'updated_at')}),
+    )
+
+    def shift_count(self, obj):
+        return obj.shifts.count()
+    shift_count.short_description = "Shifts"
+
+
+@admin.register(POSShift)
+class POSShiftAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'terminal', 'cashier_name', 'status_badge',
+        'opening_time', 'closing_time', 'total_sales_amount',
+        'total_orders', 'order_count',
+    )
+    list_filter = ('status', 'terminal', 'opening_time')
+    search_fields = ('terminal__name', 'cashier__email', 'cashier__name')
+    date_hierarchy = 'opening_time'
+    readonly_fields = (
+        'total_sales_amount', 'total_orders', 'opening_time',
+        'closing_time', 'created_at', 'updated_at',
+    )
+    fieldsets = (
+        (_('Shift Info'), {'fields': ('terminal', 'cashier')}),
+        (_('Timings'), {'fields': ('opening_time', 'closing_time', 'status')}),
+        (_('Notes'), {'fields': ('opening_note', 'closing_note')}),
+        (_('Totals'), {'fields': ('total_sales_amount', 'total_orders')}),
+        (_('Ownership'), {'fields': ('created_by',)}),
+        (_('Timestamps'), {'classes': ('collapse',), 'fields': ('created_at', 'updated_at')}),
+    )
+    actions = ('close_selected_shifts',)
+
+    def cashier_name(self, obj):
+        return obj.cashier.get_full_name() or obj.cashier.username
+    cashier_name.short_description = "Cashier"
+    cashier_name.admin_order_field = 'cashier'
+
+    def status_badge(self, obj):
+        colors = {'open': '#15803d', 'closed': '#6b7280', 'paused': '#b45309'}
+        color = colors.get(obj.status, '#666')
+        return format_html(
+            '<span style="color:{};font-weight:600;">{}</span>',
+            color, obj.get_status_display()
+        )
+    status_badge.short_description = "Status"
+
+    def order_count(self, obj):
+        return obj.orders.count()
+    order_count.short_description = "Orders"
+
+    @admin.action(description='Close selected shifts')
+    def close_selected_shifts(self, request, queryset):
+        for shift in queryset.filter(status='open'):
+            shift.close(closing_note=f"Closed by admin: {request.user}")
+        self.message_user(request, f'{queryset.count()} shift(s) closed.', messages.SUCCESS)
+
+
+@admin.register(CashRegister)
+class CashRegisterAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'terminal', 'shift_link', 'status_badge',
+        'opening_balance', 'expected_closing_balance',
+        'actual_closing_balance', 'discrepancy_display',
+        'opened_by_name', 'opened_at',
+    )
+    list_filter = ('status', 'terminal', 'opened_at')
+    search_fields = ('terminal__name', 'shift__id')
+    date_hierarchy = 'opened_at'
+    readonly_fields = (
+        'opening_balance', 'expected_closing_balance',
+        'opened_at', 'closed_at', 'created_at', 'updated_at',
+    )
+    fieldsets = (
+        (_('Register Info'), {'fields': ('terminal', 'shift')}),
+        (_('Balances'), {'fields': (
+            'opening_balance', 'expected_closing_balance',
+            'actual_closing_balance', 'status'
+        )}),
+        (_('Opening / Closing'), {'fields': (
+            'opened_by', 'opened_at', 'closed_by', 'closed_at'
+        )}),
+        (_('Timestamps'), {'classes': ('collapse',), 'fields': ('created_at', 'updated_at')}),
+    )
+    actions = ('reconcile_selected', 'mark_disputed_selected')
+
+    def shift_link(self, obj):
+        url = f"/admin/POS/posshift/{obj.shift.id}/change/"
+        return format_html('<a href="{}">Shift #{}</a>', url, obj.shift.id)
+    shift_link.short_description = "Shift"
+
+    def status_badge(self, obj):
+        colors = {'open': '#15803d', 'closed': '#6b7280', 'reconciled': '#2563eb', 'disputed': '#b91c1c'}
+        color = colors.get(obj.status, '#666')
+        return format_html(
+            '<span style="color:{};font-weight:600;">{}</span>',
+            color, obj.get_status_display()
+        )
+    status_badge.short_description = "Status"
+
+    def discrepancy_display(self, obj):
+        d = obj.discrepancy
+        if d is None:
+            return "-"
+        color = '#15803d' if d == 0 else '#b91c1c'
+        return format_html('<span style="color:{};font-weight:600;">{}</span>', color, d)
+    discrepancy_display.short_description = "Discrepancy"
+
+    def opened_by_name(self, obj):
+        if obj.opened_by:
+            return obj.opened_by.get_full_name() or obj.opened_by.username
+        return "-"
+    opened_by_name.short_description = "Opened By"
+    opened_by_name.admin_order_field = 'opened_by'
+
+    @admin.action(description='Reconcile selected registers')
+    def reconcile_selected(self, request, queryset):
+        for reg in queryset:
+            reg.reconcile()
+        self.message_user(request, f'{queryset.count()} register(s) reconciled.', messages.SUCCESS)
+
+    @admin.action(description='Mark selected as disputed')
+    def mark_disputed_selected(self, request, queryset):
+        for reg in queryset:
+            reg.mark_disputed()
+        self.message_user(request, f'{queryset.count()} register(s) marked as disputed.', messages.SUCCESS)
+
+
+@admin.register(CashMovement)
+class CashMovementAdmin(admin.ModelAdmin):
+    list_display = (
+        'register', 'shift_link', 'movement_type_colored',
+        'amount', 'note_short', 'reference', 'created_by', 'created_at',
+    )
+    list_filter = ('movement_type', 'created_at', 'register__terminal')
+    search_fields = ('note', 'reference', 'register__terminal__name')
+    date_hierarchy = 'created_at'
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        (_('Movement Info'), {'fields': ('register', 'shift', 'movement_type', 'amount')}),
+        (_('Details'), {'fields': ('note', 'reference')}),
+        (_('Ownership'), {'fields': ('created_by',)}),
+        (_('Timestamps'), {'classes': ('collapse',), 'fields': ('created_at', 'updated_at')}),
+    )
+
+    def shift_link(self, obj):
+        url = f"/admin/POS/posshift/{obj.shift.id}/change/"
+        return format_html('<a href="{}">Shift #{}</a>', url, obj.shift.id)
+    shift_link.short_description = "Shift"
+
+    def movement_type_colored(self, obj):
+        colors = {
+            'cash_in': '#15803d', 'cash_out': '#b91c1c',
+            'petty_cash': '#b45309', 'expense': '#7c3aed', 'adjustment': '#2563eb',
+        }
+        color = colors.get(obj.movement_type, '#666')
+        return format_html(
+            '<span style="color:{};font-weight:600;">{}</span>',
+            color, obj.get_movement_type_display()
+        )
+    movement_type_colored.short_description = "Type"
+
+    def note_short(self, obj):
+        return obj.note[:60] if obj.note else "-"
+    note_short.short_description = "Note"
